@@ -7,6 +7,8 @@ import type { NodeGeometryBuildState } from "./nodeGeometryBuildState";
 import { Observable } from "../../Misc/observable";
 import { PrecisionDate } from "../../Misc/precisionDate";
 import type { Nullable } from "../../types";
+import type { GeometryInputBlock } from "./Blocks/geometryInputBlock";
+import { Logger } from "core/Misc/logger";
 
 /**
  * Defines a block that can be used inside a node based geometry
@@ -279,6 +281,8 @@ export class NodeGeometryBlock {
             if (!this._outputs.some((o) => o.hasEndpoints) && !this.isDebug) {
                 return false;
             }
+
+            this.outputs.forEach((o) => o._resetCounters());
         }
 
         this._buildId = state.buildId;
@@ -303,7 +307,7 @@ export class NodeGeometryBlock {
 
         // Logs
         if (state.verbose) {
-            console.log(`Building ${this.name} [${this.getClassName()}]`);
+            Logger.Log(`Building ${this.name} [${this.getClassName()}]`);
         }
 
         const now = PrecisionDate.Now;
@@ -381,10 +385,9 @@ export class NodeGeometryBlock {
 
     /**
      * Serializes this block in a JSON representation
-     * @param _saveMeshData defines a boolean indicating that mesh data must be saved as well
      * @returns the serialized block object
      */
-    public serialize(_saveMeshData?: boolean): any {
+    public serialize(): any {
         const serializationObject: any = {};
         serializationObject.customType = "BABYLON." + this.getClassName();
         serializationObject.id = this.uniqueId;
@@ -517,7 +520,14 @@ export class NodeGeometryBlock {
         if (this.comments) {
             codeString += `// ${this.comments}\n`;
         }
-        codeString += `var ${this._codeVariableName} = new BABYLON.${this.getClassName()}("${this.name}");\n`;
+        const className = this.getClassName();
+        if (className === "GeometryInputBlock") {
+            const block = this as unknown as GeometryInputBlock;
+            const blockType = block.type;
+            codeString += `var ${this._codeVariableName} = new BABYLON.GeometryInputBlock("${this.name}", ${blockType});\n`;
+        } else {
+            codeString += `var ${this._codeVariableName} = new BABYLON.${className}("${this.name}");\n`;
+        }
 
         // Properties
         codeString += this._dumpPropertiesCode();

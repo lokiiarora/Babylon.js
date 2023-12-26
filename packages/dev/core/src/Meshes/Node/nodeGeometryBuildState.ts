@@ -106,11 +106,14 @@ export class NodeGeometryBuildState {
     /**
      * Gets the value associated with a contextual source
      * @param source Source of the contextual value
+     * @param skipWarning Do not store the warning for reporting if true
      * @returns the value associated with the source
      */
-    public getContextualValue(source: NodeGeometryContextualSources) {
+    public getContextualValue(source: NodeGeometryContextualSources, skipWarning = false) {
         if (!this.executionContext) {
-            this.noContextualData.push(source);
+            if (!skipWarning) {
+                this.noContextualData.push(source);
+            }
             return null;
         }
 
@@ -144,6 +147,9 @@ export class NodeGeometryBuildState {
                 }
                 return Vector4.FromArray(this.geometryContext.tangents as ArrayLike<number>, index * 4);
             case NodeGeometryContextualSources.UV:
+                if (this.executionContext.getOverrideUVs1ContextualValue) {
+                    return this.executionContext.getOverrideUVs1ContextualValue();
+                }
                 if (!this.geometryContext || !this.geometryContext.uvs) {
                     return Vector2.Zero();
                 }

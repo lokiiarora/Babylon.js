@@ -1,3 +1,6 @@
+/* eslint-disable babylonjs/available */
+/* eslint-disable jsdoc/require-jsdoc */
+import { Logger } from "core/Misc/logger";
 import { ShaderLanguage } from "../../Materials/shaderLanguage";
 import type { Nullable } from "../../types";
 import type { IShaderProcessor } from "../Processors/iShaderProcessor";
@@ -82,6 +85,10 @@ export abstract class WebGPUShaderProcessor implements IShaderProcessor {
     };
 
     public shaderLanguage = ShaderLanguage.GLSL;
+
+    // this object is populated only with vertex kinds known by the engine (position, uv, ...) and only if the type of the corresponding vertex buffer is an integer type)
+    // if the type is a signed type, the value is negated
+    public vertexBufferKindToNumberOfComponents: { [kind: string]: number } = {};
 
     protected _webgpuProcessingContext: WebGPUShaderProcessingContext;
 
@@ -290,7 +297,7 @@ export abstract class WebGPUShaderProcessor implements IShaderProcessor {
     protected _injectStartingAndEndingCode(code: string, mainFuncDecl: string, startingCode?: string, endingCode?: string): string {
         let idx = code.indexOf(mainFuncDecl);
         if (idx < 0) {
-            console.error(`No "main" function found in shader code! Processing aborted.`);
+            Logger.Error(`No "main" function found in shader code! Processing aborted.`);
             return code;
         }
         if (startingCode) {

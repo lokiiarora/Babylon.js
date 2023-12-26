@@ -11,6 +11,7 @@ import { SceneComponentConstants } from "../../../sceneComponent";
 import { Material } from "../../../Materials/material";
 import type { Effect } from "../../../Materials/effect";
 import { Texture } from "../../../Materials/Textures/texture";
+import type { RenderTargetTextureOptions } from "../../../Materials/Textures/renderTargetTexture";
 import { RenderTargetTexture } from "../../../Materials/Textures/renderTargetTexture";
 import { ProceduralTextureSceneComponent } from "./proceduralTextureSceneComponent";
 
@@ -25,6 +26,16 @@ import { EngineStore } from "../../../Engines/engineStore";
 import { Constants } from "../../../Engines/constants";
 import { DrawWrapper } from "../../drawWrapper";
 import type { RenderTargetWrapper } from "../../../Engines/renderTargetWrapper";
+
+/**
+ * Options to create a procedural texture
+ */
+export interface IProceduralTextureCreationOptions extends RenderTargetTextureOptions {
+    /**
+     * Defines a fallback texture in case there were issues to create the custom texture
+     */
+    fallbackTexture?: Nullable<Texture>;
+}
 
 /**
  * Procedural texturing is a way to programmatically create a texture. There are 2 types of procedural textures: code-only, and code that references some classic 2D images, sometimes calmpler' images.
@@ -106,6 +117,7 @@ export class ProceduralTexture extends Texture {
     private _contentData: Nullable<Promise<ArrayBufferView>>;
 
     private _rtWrapper: Nullable<RenderTargetWrapper> = null;
+    private _options: IProceduralTextureCreationOptions;
 
     /**
      * Instantiates a new procedural texture.
@@ -114,7 +126,10 @@ export class ProceduralTexture extends Texture {
      * @see https://doc.babylonjs.com/features/featuresDeepDive/materials/using/proceduralTextures
      * @param name  Define the name of the texture
      * @param size Define the size of the texture to create
-     * @param fragment Define the fragment shader to use to generate the texture or null if it is defined later
+     * @param fragment Define the fragment shader to use to generate the texture or null if it is defined later:
+     *  * object: \{ fragmentElement: "fragmentShaderCode" \}, used with shader code in script tags
+     *  * object: \{ fragmentSource: "fragment shader code string" \}, the string contains the shader code
+     *  * string: the string contains a name "XXX" to lookup in Effect.ShadersStore["XXXFragmentShader"]
      * @param scene Define the scene the texture belongs to
      * @param fallbackTexture Define a fallback texture in case there were issues to create the custom texture
      * @param generateMipMaps Define if the texture should creates mip maps or not
@@ -126,12 +141,20 @@ export class ProceduralTexture extends Texture {
         size: TextureSize,
         fragment: any,
         scene: Nullable<Scene>,
-        fallbackTexture: Nullable<Texture> = null,
+        fallbackTexture: Nullable<Texture> | IProceduralTextureCreationOptions = null,
         generateMipMaps = true,
         isCube = false,
         textureType = Constants.TEXTURETYPE_UNSIGNED_INT
     ) {
         super(null, scene, !generateMipMaps);
+
+        if (fallbackTexture !== null && !(fallbackTexture instanceof Texture)) {
+            this._options = fallbackTexture;
+            this._fallbackTexture = fallbackTexture.fallbackTexture ?? null;
+        } else {
+            this._options = {};
+            this._fallbackTexture = fallbackTexture;
+        }
 
         scene = this.getScene() || EngineStore.LastCreatedScene!;
         let component = scene._getComponent(SceneComponentConstants.NAME_PROCEDURALTEXTURE);
@@ -151,8 +174,6 @@ export class ProceduralTexture extends Texture {
         this._drawWrapper = new DrawWrapper(this._fullEngine);
 
         this.setFragment(fragment);
-
-        this._fallbackTexture = fallbackTexture;
 
         const rtWrapper = this._createRtWrapper(isCube, size, generateMipMaps, textureType);
         this._texture = rtWrapper.texture;
@@ -176,6 +197,7 @@ export class ProceduralTexture extends Texture {
                 generateDepthBuffer: false,
                 generateStencilBuffer: false,
                 type: textureType,
+                ...this._options,
             });
             this.setFloat("face", 0);
         } else {
@@ -184,6 +206,7 @@ export class ProceduralTexture extends Texture {
                 generateDepthBuffer: false,
                 generateStencilBuffer: false,
                 type: textureType,
+                ...this._options,
             });
         }
         return this._rtWrapper;
@@ -191,14 +214,14 @@ export class ProceduralTexture extends Texture {
 
     /**
      * The effect that is created when initializing the post process.
-     * @returns The created effect corresponding the the postprocess.
+     * @returns The created effect corresponding the postprocess.
      */
     public getEffect(): Effect {
         return this._drawWrapper.effect!;
     }
 
     /**
-     * @internal*
+     * @internal
      */
     public _setEffect(effect: Effect) {
         this._drawWrapper.effect = effect;
@@ -272,12 +295,29 @@ export class ProceduralTexture extends Texture {
     }
 
     /**
+     * Executes a function when the texture will be ready to be drawn.
+     * @param func The callback to be used.
+     */
+    public executeWhenReady(func: (texture: ProceduralTexture) => void): void {
+        if (this.isReady()) {
+            func(this);
+            return;
+        }
+
+        const effect = this.getEffect();
+        if (effect) {
+            effect.executeWhenCompiled(() => {
+                func(this);
+            });
+        }
+    }
+
+    /**
      * Is the texture ready to be used ? (rendered at least once)
      * @returns true if ready, otherwise, false.
      */
     public isReady(): boolean {
         const engine = this._fullEngine;
-        let shaders;
 
         if (this.nodeMaterialSource) {
             return this._drawWrapper.effect!.isReady();
@@ -300,11 +340,12 @@ export class ProceduralTexture extends Texture {
             return true;
         }
 
-        if (this._fragment.fragmentElement !== undefined) {
-            shaders = { vertex: "procedural", fragmentElement: this._fragment.fragmentElement };
-        } else {
-            shaders = { vertex: "procedural", fragment: this._fragment };
-        }
+        const shaders = {
+            vertex: "procedural",
+            fragmentElement: this._fragment.fragmentElement,
+            fragmentSource: this._fragment.fragmentSource,
+            fragment: typeof this._fragment === "string" ? this._fragment : undefined,
+        };
 
         if (this._cachedDefines !== defines) {
             this._cachedDefines = defines;

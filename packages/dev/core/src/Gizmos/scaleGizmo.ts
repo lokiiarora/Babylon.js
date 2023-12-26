@@ -3,11 +3,12 @@ import type { Observer } from "../Misc/observable";
 import { Observable } from "../Misc/observable";
 import type { Nullable } from "../types";
 import { Vector3 } from "../Maths/math.vector";
+import type { Quaternion } from "../Maths/math.vector";
 import { Color3 } from "../Maths/math.color";
 import type { AbstractMesh } from "../Meshes/abstractMesh";
 import { CreatePolyhedron } from "../Meshes/Builders/polyhedronBuilder";
-import type { GizmoAnchorPoint, GizmoCoordinatesMode, GizmoAxisCache, IGizmo } from "./gizmo";
-import { Gizmo } from "./gizmo";
+import type { GizmoAnchorPoint, GizmoAxisCache, IGizmo } from "./gizmo";
+import { GizmoCoordinatesMode, Gizmo } from "./gizmo";
 import type { IAxisScaleGizmo } from "./axisScaleGizmo";
 import { AxisScaleGizmo } from "./axisScaleGizmo";
 import { UtilityLayerRenderer } from "../Rendering/utilityLayerRenderer";
@@ -31,10 +32,14 @@ export interface IScaleGizmo extends IGizmo {
     uniformScaleGizmo: IAxisScaleGizmo;
     /** Fires an event when any of it's sub gizmos are dragged */
     onDragStartObservable: Observable<unknown>;
+    /** Fires an event when any of it's sub gizmos are being dragged */
+    onDragObservable: Observable<unknown>;
     /** Fires an event when any of it's sub gizmos are released from dragging */
     onDragEndObservable: Observable<unknown>;
     /** Drag distance in babylon units that the gizmo will snap to when dragged */
     snapDistance: number;
+    /** Incremental snap scaling. When true, with a snapDistance of 0.1, scaling will be 1.1,1.2,1.3 instead of, when false: 1.1,1.21,1.33,... */
+    incrementalSnap: boolean;
     /** Sensitivity factor for dragging */
     sensitivity: number;
     /**
@@ -77,6 +82,7 @@ export class ScaleGizmo extends Gizmo implements IScaleGizmo {
     protected _meshAttached: Nullable<AbstractMesh> = null;
     protected _nodeAttached: Nullable<Node> = null;
     protected _snapDistance: number;
+    protected _incrementalSnap: boolean = false;
     protected _uniformScalingMesh: Mesh;
     protected _octahedron: Mesh;
     protected _sensitivity: number = 1;
@@ -104,6 +110,8 @@ export class ScaleGizmo extends Gizmo implements IScaleGizmo {
     }
     /** Fires an event when any of it's sub gizmos are dragged */
     public onDragStartObservable = new Observable();
+    /** Fires an event when any of it's sub gizmos are being dragged */
+    public onDragObservable = new Observable();
     /** Fires an event when any of it's sub gizmos are released from dragging */
     public onDragEndObservable = new Observable();
 
@@ -151,11 +159,7 @@ export class ScaleGizmo extends Gizmo implements IScaleGizmo {
      * True when the mouse pointer is hovering a gizmo mesh
      */
     public get isHovered() {
-        let hovered = false;
-        [this.xGizmo, this.yGizmo, this.zGizmo].forEach((gizmo) => {
-            hovered = hovered || gizmo.isHovered;
-        });
-        return hovered;
+        return this.xGizmo.isHovered || this.yGizmo.isHovered || this.zGizmo.isHovered;
     }
 
     /**
@@ -175,6 +179,9 @@ export class ScaleGizmo extends Gizmo implements IScaleGizmo {
         [this.xGizmo, this.yGizmo, this.zGizmo, this.uniformScaleGizmo].forEach((gizmo) => {
             gizmo.dragBehavior.onDragStartObservable.add(() => {
                 this.onDragStartObservable.notifyObservers({});
+            });
+            gizmo.dragBehavior.onDragObservable.add(() => {
+                this.onDragObservable.notifyObservers({});
             });
             gizmo.dragBehavior.onDragEndObservable.add(() => {
                 this.onDragEndObservable.notifyObservers({});
@@ -261,13 +268,33 @@ export class ScaleGizmo extends Gizmo implements IScaleGizmo {
     }
 
     /**
+     * posture that the gizmo will be display
+     * When set null, default value will be used (Quaternion(0, 0, 0, 1))
+     */
+    public get customRotationQuaternion(): Nullable<Quaternion> {
+        return this._customRotationQuaternion;
+    }
+
+    public set customRotationQuaternion(customRotationQuaternion: Nullable<Quaternion>) {
+        this._customRotationQuaternion = customRotationQuaternion;
+        [this.xGizmo, this.yGizmo, this.zGizmo, this.uniformScaleGizmo].forEach((gizmo) => {
+            if (gizmo) {
+                gizmo.customRotationQuaternion = customRotationQuaternion;
+            }
+        });
+    }
+
+    /**
      * Set the coordinate system to use. By default it's local.
      * But it's possible for a user to tweak so its local for translation and world for rotation.
      * In that case, setting the coordinate system will change `updateGizmoRotationToMatchAttachedMesh` and `updateGizmoPositionToMatchAttachedMesh`
      */
     public set coordinatesMode(coordinatesMode: GizmoCoordinatesMode) {
+        if (coordinatesMode == GizmoCoordinatesMode.World) {
+            Logger.Warn("Setting coordinates Mode to world on scaling gizmo is not supported.");
+        }
         [this.xGizmo, this.yGizmo, this.zGizmo, this.uniformScaleGizmo].forEach((gizmo) => {
-            gizmo.coordinatesMode = coordinatesMode;
+            gizmo.coordinatesMode = GizmoCoordinatesMode.Local;
         });
     }
 
@@ -286,6 +313,20 @@ export class ScaleGizmo extends Gizmo implements IScaleGizmo {
         return this._snapDistance;
     }
 
+    /**
+     * Incremental snap scaling (default is false). When true, with a snapDistance of 0.1, scaling will be 1.1,1.2,1.3 instead of, when false: 1.1,1.21,1.33,...
+     */
+    public set incrementalSnap(value: boolean) {
+        this._incrementalSnap = value;
+        [this.xGizmo, this.yGizmo, this.zGizmo, this.uniformScaleGizmo].forEach((gizmo) => {
+            if (gizmo) {
+                gizmo.incrementalSnap = value;
+            }
+        });
+    }
+    public get incrementalSnap() {
+        return this._incrementalSnap;
+    }
     /**
      * Ratio for the scale of the gizmo (Default: 1)
      */
@@ -338,6 +379,7 @@ export class ScaleGizmo extends Gizmo implements IScaleGizmo {
             this.gizmoLayer.utilityLayerScene.onPointerObservable.remove(obs);
         });
         this.onDragStartObservable.clear();
+        this.onDragObservable.clear();
         this.onDragEndObservable.clear();
         [this._uniformScalingMesh, this._octahedron].forEach((msh) => {
             if (msh) {

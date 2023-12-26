@@ -9,6 +9,8 @@ import type { ExternalTexture } from "./externalTexture";
 
 import "../../Engines/Extensions/engine.videoTexture";
 import "../../Engines/Extensions/engine.dynamicTexture";
+import { serialize } from "core/Misc/decorators";
+import { RegisterClass } from "core/Misc/typeStore";
 
 function removeSource(video: HTMLVideoElement): void {
     // Remove any <source> elements, etc.
@@ -83,7 +85,7 @@ export class VideoTexture extends Texture {
      */
     public readonly video: HTMLVideoElement;
 
-    private _externalTexture: Nullable<ExternalTexture>;
+    private _externalTexture: Nullable<ExternalTexture> = null;
     private _onUserActionRequestedObservable: Nullable<Observable<Texture>> = null;
 
     /**
@@ -100,12 +102,20 @@ export class VideoTexture extends Texture {
     private _generateMipMaps: boolean;
     private _stillImageCaptured = false;
     private _displayingPosterTexture = false;
+    @serialize("settings")
     private _settings: VideoTextureSettings;
     private _createInternalTextureOnEvent: string;
     private _frameId = -1;
+    @serialize("src")
     private _currentSrc: Nullable<string | string[] | HTMLVideoElement> = null;
     private _onError?: Nullable<(message?: string, exception?: any) => void>;
     private _errorFound = false;
+
+    /**
+     * Serialize the flag to define this texture as a video texture
+     */
+    @serialize()
+    public readonly isVideo = true;
 
     private _processError(reason: any) {
         this._errorFound = true;
@@ -182,7 +192,10 @@ export class VideoTexture extends Texture {
         this._currentSrc = src;
         this.name = name || this._getName(src);
         this.video = this._getVideo(src);
-        this._externalTexture = this._engine?.createExternalTexture(this.video) ?? null;
+        if (this._engine?.createExternalTexture) {
+            this._externalTexture = this._engine.createExternalTexture(this.video);
+        }
+
         if (!this._settings.independentVideoSource) {
             if (this._settings.poster) {
                 this.video.poster = this._settings.poster;
@@ -574,3 +587,19 @@ export class VideoTexture extends Texture {
             });
     }
 }
+
+Texture._CreateVideoTexture = (
+    name: Nullable<string>,
+    src: string | string[] | HTMLVideoElement,
+    scene: Nullable<Scene>,
+    generateMipMaps = false,
+    invertY = false,
+    samplingMode: number = Texture.TRILINEAR_SAMPLINGMODE,
+    settings: Partial<VideoTextureSettings> = {},
+    onError?: Nullable<(message?: string, exception?: any) => void>,
+    format: number = Constants.TEXTUREFORMAT_RGBA
+) => {
+    return new VideoTexture(name, src, scene, generateMipMaps, invertY, samplingMode, settings, onError, format);
+};
+// Some exporters relies on Tools.Instantiate
+RegisterClass("BABYLON.VideoTexture", VideoTexture);

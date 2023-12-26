@@ -4,10 +4,12 @@ import { FromHalfFloat } from "../../Misc/textureTools";
 import type { Nullable } from "../../types";
 import { Constants } from "../constants";
 import { allocateAndCopyTypedBuffer } from "../Extensions/engine.readTexture";
+import type { WebGPUEngine } from "../webgpuEngine";
 import * as WebGPUConstants from "./webgpuConstants";
 
 /** @internal */
 export class WebGPUBufferManager {
+    private _engine: WebGPUEngine;
     private _device: GPUDevice;
     private _deferredReleaseBuffers: Array<GPUBuffer> = [];
 
@@ -15,13 +17,30 @@ export class WebGPUBufferManager {
         return (buffer as DataBuffer).underlyingResource === undefined;
     }
 
-    constructor(device: GPUDevice) {
+    private static _FlagsToString(flags: GPUBufferUsageFlags, suffix = "") {
+        let result = suffix;
+
+        for (let i = 0; i <= 9; ++i) {
+            if (flags & (1 << i)) {
+                if (result) {
+                    result += "_";
+                }
+                result += WebGPUConstants.BufferUsage[1 << i];
+            }
+        }
+
+        return result;
+    }
+
+    constructor(engine: WebGPUEngine, device: GPUDevice) {
+        this._engine = engine;
         this._device = device;
     }
 
-    public createRawBuffer(viewOrSize: ArrayBufferView | number, flags: GPUBufferUsageFlags, mappedAtCreation = false): GPUBuffer {
+    public createRawBuffer(viewOrSize: ArrayBufferView | number, flags: GPUBufferUsageFlags, mappedAtCreation = false, label?: string): GPUBuffer {
         const alignedLength = (viewOrSize as ArrayBufferView).byteLength !== undefined ? ((viewOrSize as ArrayBufferView).byteLength + 3) & ~3 : ((viewOrSize as number) + 3) & ~3; // 4 bytes alignments (because of the upload which requires this)
         const verticesBufferDescriptor = {
+            label: WebGPUBufferManager._FlagsToString(flags, label ?? "Buffer") + "_size" + alignedLength,
             mappedAtCreation,
             size: alignedLength,
             usage: flags,
@@ -30,9 +49,9 @@ export class WebGPUBufferManager {
         return this._device.createBuffer(verticesBufferDescriptor);
     }
 
-    public createBuffer(viewOrSize: ArrayBufferView | number, flags: GPUBufferUsageFlags): WebGPUDataBuffer {
+    public createBuffer(viewOrSize: ArrayBufferView | number, flags: GPUBufferUsageFlags, label?: string): WebGPUDataBuffer {
         const isView = (viewOrSize as ArrayBufferView).byteLength !== undefined;
-        const buffer = this.createRawBuffer(viewOrSize, flags);
+        const buffer = this.createRawBuffer(viewOrSize, flags, undefined, label);
         const dataBuffer = new WebGPUDataBuffer(buffer);
         dataBuffer.references = 1;
         dataBuffer.capacity = isView ? (viewOrSize as ArrayBufferView).byteLength : (viewOrSize as number);
@@ -179,7 +198,13 @@ export class WebGPUBufferManager {
                     }
                     resolve(data!);
                 },
-                (reason) => reject(reason)
+                (reason) => {
+                    if (this._engine.isDisposed) {
+                        resolve(new Uint8Array());
+                    } else {
+                        reject(reason);
+                    }
+                }
             );
         });
     }

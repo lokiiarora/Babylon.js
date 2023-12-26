@@ -66,6 +66,7 @@ import type { PrePassTextureBlock } from "./Blocks/Input/prePassTextureBlock";
 import type { PrePassOutputBlock } from "./Blocks/Fragment/prePassOutputBlock";
 import type { NodeMaterialTeleportOutBlock } from "./Blocks/Teleport/teleportOutBlock";
 import type { NodeMaterialTeleportInBlock } from "./Blocks/Teleport/teleportInBlock";
+import { Logger } from "core/Misc/logger";
 
 const onCreatedEffectParameters = { effect: null as unknown as Effect, subMesh: null as unknown as Nullable<SubMesh> };
 
@@ -201,7 +202,7 @@ export class NodeMaterial extends PushMaterial {
     private _animationFrame = -1;
 
     /** Define the Url to load node editor script */
-    public static EditorURL = `https://unpkg.com/babylonjs-node-editor@${Engine.Version}/babylon.nodeEditor.js`;
+    public static EditorURL = `${Tools._DefaultCdnUrl}/v${Engine.Version}/nodeEditor/babylon.nodeEditor.js`;
 
     /** Define the Url to load snippets */
     public static SnippetUrl = Constants.SnippetUrl;
@@ -319,7 +320,7 @@ export class NodeMaterial extends PushMaterial {
     /**
      * Gets an array of blocks that needs to be serialized even if they are not yet connected
      */
-    public attachedBlocks = new Array<NodeMaterialBlock>();
+    public attachedBlocks: NodeMaterialBlock[] = [];
 
     /**
      * Specifies the mode of the node material
@@ -436,7 +437,7 @@ export class NodeMaterial extends PushMaterial {
     }
 
     /**
-     * Get a block by its name
+     * Get a block using a predicate
      * @param predicate defines the predicate used to find the good candidate
      * @returns the required block or null if not found
      */
@@ -451,7 +452,7 @@ export class NodeMaterial extends PushMaterial {
     }
 
     /**
-     * Get an input block by its name
+     * Get an input block using a predicate
      * @param predicate defines the predicate used to find the good candidate
      * @returns the required input block or null if not found
      */
@@ -753,6 +754,7 @@ export class NodeMaterial extends PushMaterial {
 
         // Shared data
         this._sharedData = new NodeMaterialBuildStateSharedData();
+        this._sharedData.nodeMaterial = this;
         this._sharedData.fragmentOutputNodes = this._fragmentOutputNodes;
         this._vertexCompilationState.sharedData = this._sharedData;
         this._fragmentCompilationState.sharedData = this._sharedData;
@@ -810,10 +812,10 @@ export class NodeMaterial extends PushMaterial {
         this._sharedData.emitErrors();
 
         if (verbose) {
-            console.log("Vertex shader:");
-            console.log(this._vertexCompilationState.compilationString);
-            console.log("Fragment shader:");
-            console.log(this._fragmentCompilationState.compilationString);
+            Logger.Log("Vertex shader:");
+            Logger.Log(this._vertexCompilationState.compilationString);
+            Logger.Log("Fragment shader:");
+            Logger.Log(this._fragmentCompilationState.compilationString);
         }
 
         this._buildWasSuccessful = true;
@@ -993,7 +995,7 @@ export class NodeMaterial extends PushMaterial {
         textureFormat = Constants.TEXTUREFORMAT_RGBA
     ): Nullable<PostProcess> {
         if (this.mode !== NodeMaterialModes.PostProcess) {
-            console.log("Incompatible material mode");
+            Logger.Log("Incompatible material mode");
             return null;
         }
         return this._createEffectForPostProcess(null, camera, options, samplingMode, engine, reusable, textureType, textureFormat);
@@ -1107,7 +1109,7 @@ export class NodeMaterial extends PushMaterial {
      */
     public createProceduralTexture(size: number | { width: number; height: number; layers?: number }, scene: Scene): Nullable<ProceduralTexture> {
         if (this.mode !== NodeMaterialModes.ProceduralTexture) {
-            console.log("Incompatible material mode");
+            Logger.Log("Incompatible material mode");
             return null;
         }
 
@@ -1124,18 +1126,20 @@ export class NodeMaterial extends PushMaterial {
         const result = this._processDefines(dummyMesh, defines);
         Effect.RegisterShader(tempName, this._fragmentCompilationState._builtCompilationString, this._vertexCompilationState._builtCompilationString);
 
-        let effect = this.getScene().getEngine().createEffect(
-            {
-                vertexElement: tempName,
-                fragmentElement: tempName,
-            },
-            [VertexBuffer.PositionKind],
-            this._fragmentCompilationState.uniforms,
-            this._fragmentCompilationState.samplers,
-            defines.toString(),
-            result?.fallbacks,
-            undefined
-        );
+        let effect = this.getScene()
+            .getEngine()
+            .createEffect(
+                {
+                    vertexElement: tempName,
+                    fragmentElement: tempName,
+                },
+                [VertexBuffer.PositionKind],
+                this._fragmentCompilationState.uniforms,
+                this._fragmentCompilationState.samplers,
+                defines.toString(),
+                result?.fallbacks,
+                undefined
+            );
 
         proceduralTexture.nodeMaterialSource = this;
         proceduralTexture._setEffect(effect);
@@ -1159,18 +1163,20 @@ export class NodeMaterial extends PushMaterial {
                 Effect.RegisterShader(tempName, this._fragmentCompilationState._builtCompilationString, this._vertexCompilationState._builtCompilationString);
 
                 TimingTools.SetImmediate(() => {
-                    effect = this.getScene().getEngine().createEffect(
-                        {
-                            vertexElement: tempName,
-                            fragmentElement: tempName,
-                        },
-                        [VertexBuffer.PositionKind],
-                        this._fragmentCompilationState.uniforms,
-                        this._fragmentCompilationState.samplers,
-                        defines.toString(),
-                        result?.fallbacks,
-                        undefined
-                    );
+                    effect = this.getScene()
+                        .getEngine()
+                        .createEffect(
+                            {
+                                vertexElement: tempName,
+                                fragmentElement: tempName,
+                            },
+                            [VertexBuffer.PositionKind],
+                            this._fragmentCompilationState.uniforms,
+                            this._fragmentCompilationState.samplers,
+                            defines.toString(),
+                            result?.fallbacks,
+                            undefined
+                        );
 
                     proceduralTexture._setEffect(effect);
                 });
@@ -1321,7 +1327,7 @@ export class NodeMaterial extends PushMaterial {
      */
     public createEffectForParticles(particleSystem: IParticleSystem, onCompiled?: (effect: Effect) => void, onError?: (effect: Effect, errors: string) => void) {
         if (this.mode !== NodeMaterialModes.Particle) {
-            console.log("Incompatible material mode");
+            Logger.Log("Incompatible material mode");
             return;
         }
 
@@ -1335,7 +1341,7 @@ export class NodeMaterial extends PushMaterial {
      */
     public createAsShadowDepthWrapper(targetMaterial: Material) {
         if (this.mode !== NodeMaterialModes.Material) {
-            console.log("Incompatible material mode");
+            Logger.Log("Incompatible material mode");
             return;
         }
 
@@ -1743,7 +1749,7 @@ export class NodeMaterial extends PushMaterial {
                 const editorUrl = config && config.editorURL ? config.editorURL : NodeMaterial.EditorURL;
 
                 // Load editor and add it to the DOM
-                Tools.LoadScript(editorUrl, () => {
+                Tools.LoadBabylonScript(editorUrl, () => {
                     this.BJSNODEMATERIALEDITOR = this.BJSNODEMATERIALEDITOR || this._getGlobalNodeMaterialEditor();
                     this._createNodeEditor(config?.nodeEditorConfig);
                     resolve();
@@ -2324,7 +2330,7 @@ export class NodeMaterial extends PushMaterial {
         const material = targetMaterial ?? new NodeMaterial(name, scene);
 
         const data = await scene._loadFileAsync(url);
-        const serializationObject = JSON.parse(data as string);
+        const serializationObject = JSON.parse(data);
         material.parseSerializedObject(serializationObject, rootUrl);
         if (!skipBuild) {
             material.build();

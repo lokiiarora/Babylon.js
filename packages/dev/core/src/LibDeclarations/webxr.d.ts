@@ -1063,14 +1063,19 @@ interface XRFrame {
     // Anchors
     trackedAnchors?: XRAnchorSet;
     // World geometries. DEPRECATED
-    worldInformation?: XRWorldInformation;
-    detectedPlanes?: XRPlaneSet;
+    worldInformation?: XRWorldInformation | undefined;
+    detectedPlanes?: XRPlaneSet | undefined;
     // Hand tracking
     getJointPose?(joint: XRJointSpace, baseSpace: XRSpace): XRJointPose;
     fillJointRadii?(jointSpaces: XRJointSpace[], radii: Float32Array): boolean;
     // Image tracking
     getImageTrackingResults?(): Array<XRImageTrackingResult>;
     getLightEstimate(xrLightProbe: XRLightProbe): XRLightEstimate;
+}
+
+// Plane detection
+interface XRSession {
+    initiateRoomCapture?(): Promise<void>;
 }
 
 type XREventType = keyof XRSessionEventMap;
@@ -1195,7 +1200,32 @@ interface XRSession {
     enabledFeatures: string[];
 }
 
-/**
- * END: WebXR Depth Sensing Moudle
- * https://www.w3.org/TR/webxr-depth-sensing-1/
- */
+// Raw camera access
+
+interface XRView {
+    readonly camera: XRCamera | undefined;
+}
+
+interface XRCamera {
+    readonly width: number;
+    readonly height: number;
+}
+
+interface XRWebGLBinding {
+    getCameraImage(camera: XRCamera): WebGLTexture | undefined;
+}
+
+// Mesh Detection
+
+interface XRMesh {
+    meshSpace: XRSpace;
+    vertices: Float32Array;
+    indices: Uint32Array;
+    lastChangedTime: number;
+}
+
+type XRMeshSet = Set<XRMesh>;
+
+interface XRFrame {
+    detectedMeshes?: XRMeshSet;
+}

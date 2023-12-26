@@ -1,9 +1,13 @@
+/* eslint-disable babylonjs/available */
+/* eslint-disable @typescript-eslint/naming-convention */
+import type { WebGPUEngine } from "../webgpuEngine";
 import type { WebGPUBufferManager } from "./webgpuBufferManager";
 import * as WebGPUConstants from "./webgpuConstants";
 import type { QueryType } from "./webgpuConstants";
 
 /** @internal */
 export class WebGPUQuerySet {
+    private _engine: WebGPUEngine;
     private _device: GPUDevice;
     private _bufferManager: WebGPUBufferManager;
 
@@ -17,7 +21,8 @@ export class WebGPUQuerySet {
         return this._querySet;
     }
 
-    constructor(count: number, type: QueryType, device: GPUDevice, bufferManager: WebGPUBufferManager, canUseMultipleBuffers = true, label?: string) {
+    constructor(engine: WebGPUEngine, count: number, type: QueryType, device: GPUDevice, bufferManager: WebGPUBufferManager, canUseMultipleBuffers = true, label?: string) {
+        this._engine = engine;
         this._device = device;
         this._bufferManager = bufferManager;
         this._count = count;
@@ -29,10 +34,17 @@ export class WebGPUQuerySet {
             count,
         });
 
-        this._queryBuffer = bufferManager.createRawBuffer(8 * count, WebGPUConstants.BufferUsage.QueryResolve | WebGPUConstants.BufferUsage.CopySrc);
+        this._queryBuffer = bufferManager.createRawBuffer(8 * count, WebGPUConstants.BufferUsage.QueryResolve | WebGPUConstants.BufferUsage.CopySrc, undefined, "QueryBuffer");
 
         if (!canUseMultipleBuffers) {
-            this._dstBuffers.push(this._bufferManager.createRawBuffer(8 * this._count, WebGPUConstants.BufferUsage.MapRead | WebGPUConstants.BufferUsage.CopyDst));
+            this._dstBuffers.push(
+                this._bufferManager.createRawBuffer(
+                    8 * this._count,
+                    WebGPUConstants.BufferUsage.MapRead | WebGPUConstants.BufferUsage.CopyDst,
+                    undefined,
+                    "QueryBufferNoMultipleBuffers"
+                )
+            );
         }
     }
 
@@ -45,7 +57,12 @@ export class WebGPUQuerySet {
 
         let buffer: GPUBuffer;
         if (this._dstBuffers.length === 0) {
-            buffer = this._bufferManager.createRawBuffer(8 * this._count, WebGPUConstants.BufferUsage.MapRead | WebGPUConstants.BufferUsage.CopyDst);
+            buffer = this._bufferManager.createRawBuffer(
+                8 * this._count,
+                WebGPUConstants.BufferUsage.MapRead | WebGPUConstants.BufferUsage.CopyDst,
+                undefined,
+                "QueryBufferAdditionalBuffer"
+            );
         } else {
             buffer = this._dstBuffers[this._dstBuffers.length - 1];
             this._dstBuffers.length--;
@@ -65,15 +82,23 @@ export class WebGPUQuerySet {
             return null;
         }
 
-        await buffer.mapAsync(WebGPUConstants.MapMode.Read);
+        return buffer.mapAsync(WebGPUConstants.MapMode.Read).then(
+            () => {
+                const arrayBuf = new BigUint64Array(buffer.getMappedRange()).slice();
 
-        const arrayBuf = new BigUint64Array(buffer.getMappedRange()).slice();
+                buffer.unmap();
 
-        buffer.unmap();
+                this._dstBuffers[this._dstBuffers.length] = buffer;
 
-        this._dstBuffers[this._dstBuffers.length] = buffer;
-
-        return arrayBuf;
+                return arrayBuf;
+            },
+            (err) => {
+                if (this._engine.isDisposed) {
+                    return null;
+                }
+                throw err;
+            }
+        );
     }
 
     public async readValue(firstQuery = 0): Promise<number | null> {
@@ -82,16 +107,24 @@ export class WebGPUQuerySet {
             return null;
         }
 
-        await buffer.mapAsync(WebGPUConstants.MapMode.Read);
+        return buffer.mapAsync(WebGPUConstants.MapMode.Read).then(
+            () => {
+                const arrayBuf = new BigUint64Array(buffer.getMappedRange());
+                const value = Number(arrayBuf[0]);
 
-        const arrayBuf = new BigUint64Array(buffer.getMappedRange());
-        const value = Number(arrayBuf[0]);
+                buffer.unmap();
 
-        buffer.unmap();
+                this._dstBuffers[this._dstBuffers.length] = buffer;
 
-        this._dstBuffers[this._dstBuffers.length] = buffer;
-
-        return value;
+                return value;
+            },
+            (err) => {
+                if (this._engine.isDisposed) {
+                    return 0;
+                }
+                throw err;
+            }
+        );
     }
 
     public async readTwoValuesAndSubtract(firstQuery = 0): Promise<number | null> {
@@ -100,16 +133,24 @@ export class WebGPUQuerySet {
             return null;
         }
 
-        await buffer.mapAsync(WebGPUConstants.MapMode.Read);
+        return buffer.mapAsync(WebGPUConstants.MapMode.Read).then(
+            () => {
+                const arrayBuf = new BigUint64Array(buffer.getMappedRange());
+                const value = Number(arrayBuf[1] - arrayBuf[0]);
 
-        const arrayBuf = new BigUint64Array(buffer.getMappedRange());
-        const value = Number(arrayBuf[1] - arrayBuf[0]);
+                buffer.unmap();
 
-        buffer.unmap();
+                this._dstBuffers[this._dstBuffers.length] = buffer;
 
-        this._dstBuffers[this._dstBuffers.length] = buffer;
-
-        return value;
+                return value;
+            },
+            (err) => {
+                if (this._engine.isDisposed) {
+                    return 0;
+                }
+                throw err;
+            }
+        );
     }
 
     public dispose() {

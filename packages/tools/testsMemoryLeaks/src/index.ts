@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { findLeaks } from "@memlab/api";
 import { MemLabConfig } from "@memlab/core";
 import type { IScenario } from "@memlab/core";
@@ -105,7 +106,7 @@ export async function takeSnapshotsLocal(options: RunOptions = {}): Promise<Brow
             const leaks = await findLeaks(await takeSnapshotsLocal({ scenario }));
             if (leaks.length > 0) {
                 // console.log(leaks);
-                throw new Error(leaks.length + " leak(s) found");
+                throw new Error(leaks.length + " leak(s) found @ " + playground);
             }
         };
     });

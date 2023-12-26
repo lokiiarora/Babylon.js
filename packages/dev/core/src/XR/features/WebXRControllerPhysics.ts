@@ -171,7 +171,10 @@ export class WebXRControllerPhysics extends WebXRAbstractFeature {
      * @param _xrSessionManager the corresponding xr session manager
      * @param _options options to create this feature with
      */
-    constructor(_xrSessionManager: WebXRSessionManager, private readonly _options: IWebXRControllerPhysicsOptions) {
+    constructor(
+        _xrSessionManager: WebXRSessionManager,
+        private readonly _options: IWebXRControllerPhysicsOptions
+    ) {
         super(_xrSessionManager);
         if (!this._options.physicsProperties) {
             this._options.physicsProperties = {};
@@ -339,7 +342,7 @@ export class WebXRControllerPhysics extends WebXRAbstractFeature {
             }
             comparedPosition.copyFrom(controllerMesh.position);
             if (this._debugMode) {
-                console.log(this._tmpVector, "linear");
+                Logger.Log([this._tmpVector, "linear"]);
             }
 
             const comparedQuaternion = controllerData.oldRotation || controllerData.impostorMesh!.rotationQuaternion!;
@@ -367,7 +370,7 @@ export class WebXRControllerPhysics extends WebXRAbstractFeature {
             }
             comparedQuaternion.copyFrom(controllerMesh.rotationQuaternion!);
             if (this._debugMode) {
-                console.log(this._tmpVector, this._tmpQuaternion, "angular");
+                Logger.Log([this._tmpVector, this._tmpQuaternion, "angular"]);
             }
         });
     }

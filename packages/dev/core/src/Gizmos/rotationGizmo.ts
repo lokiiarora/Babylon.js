@@ -3,6 +3,7 @@ import type { Observer } from "../Misc/observable";
 import { Observable } from "../Misc/observable";
 import type { Nullable } from "../types";
 import { Vector3 } from "../Maths/math.vector";
+import type { Quaternion } from "../Maths/math.vector";
 import { Color3 } from "../Maths/math.color";
 import type { AbstractMesh } from "../Meshes/abstractMesh";
 import type { Mesh } from "../Meshes/mesh";
@@ -28,6 +29,8 @@ export interface IRotationGizmo extends IGizmo {
     zGizmo: IPlaneRotationGizmo;
     /** Fires an event when any of it's sub gizmos are dragged */
     onDragStartObservable: Observable<unknown>;
+    /** Fires an event when any of it's sub gizmos are being dragged */
+    onDragObservable: Observable<unknown>;
     /** Fires an event when any of it's sub gizmos are released from dragging */
     onDragEndObservable: Observable<unknown>;
     /** Drag distance in babylon units that the gizmo will snap to when dragged */
@@ -97,6 +100,8 @@ export class RotationGizmo extends Gizmo implements IRotationGizmo {
 
     /** Fires an event when any of it's sub gizmos are dragged */
     public onDragStartObservable = new Observable();
+    /** Fires an event when any of it's sub gizmos are being dragged */
+    public onDragObservable = new Observable();
     /** Fires an event when any of it's sub gizmos are released from dragging */
     public onDragEndObservable = new Observable();
 
@@ -142,7 +147,7 @@ export class RotationGizmo extends Gizmo implements IRotationGizmo {
 
     protected _checkBillboardTransform() {
         if (this._nodeAttached && (<TransformNode>this._nodeAttached).billboardMode) {
-            console.log("Rotation Gizmo will not work with transforms in billboard mode.");
+            Logger.Log("Rotation Gizmo will not work with transforms in billboard mode.");
         }
     }
 
@@ -165,11 +170,7 @@ export class RotationGizmo extends Gizmo implements IRotationGizmo {
      * True when the mouse pointer is hovering a gizmo mesh
      */
     public get isHovered() {
-        let hovered = false;
-        [this.xGizmo, this.yGizmo, this.zGizmo].forEach((gizmo) => {
-            hovered = hovered || gizmo.isHovered;
-        });
-        return hovered;
+        return this.xGizmo.isHovered || this.yGizmo.isHovered || this.zGizmo.isHovered;
     }
 
     /**
@@ -205,6 +206,9 @@ export class RotationGizmo extends Gizmo implements IRotationGizmo {
             }
             gizmo.dragBehavior.onDragStartObservable.add(() => {
                 this.onDragStartObservable.notifyObservers({});
+            });
+            gizmo.dragBehavior.onDragObservable.add(() => {
+                this.onDragObservable.notifyObservers({});
             });
             gizmo.dragBehavior.onDragEndObservable.add(() => {
                 this.onDragEndObservable.notifyObservers({});
@@ -308,6 +312,23 @@ export class RotationGizmo extends Gizmo implements IRotationGizmo {
     }
 
     /**
+     * posture that the gizmo will be display
+     * When set null, default value will be used (Quaternion(0, 0, 0, 1))
+     */
+    public get customRotationQuaternion(): Nullable<Quaternion> {
+        return this._customRotationQuaternion;
+    }
+
+    public set customRotationQuaternion(customRotationQuaternion: Nullable<Quaternion>) {
+        this._customRotationQuaternion = customRotationQuaternion;
+        [this.xGizmo, this.yGizmo, this.zGizmo].forEach((gizmo) => {
+            if (gizmo) {
+                gizmo.customRotationQuaternion = customRotationQuaternion;
+            }
+        });
+    }
+
+    /**
      * Builds Gizmo Axis Cache to enable features such as hover state preservation and graying out other axis during manipulation
      * @param mesh Axis gizmo mesh
      * @param cache Gizmo axis definition used for reactive gizmo UI
@@ -324,6 +345,7 @@ export class RotationGizmo extends Gizmo implements IRotationGizmo {
         this.yGizmo.dispose();
         this.zGizmo.dispose();
         this.onDragStartObservable.clear();
+        this.onDragObservable.clear();
         this.onDragEndObservable.clear();
         this._observables.forEach((obs) => {
             this.gizmoLayer.utilityLayerScene.onPointerObservable.remove(obs);

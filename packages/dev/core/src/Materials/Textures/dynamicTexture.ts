@@ -14,6 +14,7 @@ import type { ICanvas, ICanvasRenderingContext } from "../../Engines/ICanvas";
 export class DynamicTexture extends Texture {
     private _generateMipMaps: boolean;
     private _canvas: ICanvas;
+    private _ownCanvas: boolean;
     private _context: ICanvasRenderingContext;
 
     /**
@@ -51,9 +52,11 @@ export class DynamicTexture extends Texture {
 
         if (options.getContext) {
             this._canvas = options;
+            this._ownCanvas = false;
             this._texture = engine.createDynamicTexture(options.width, options.height, generateMipMaps, samplingMode);
         } else {
             this._canvas = engine.createCanvas(1, 1);
+            this._ownCanvas = true;
 
             if (options.width || options.width === 0) {
                 this._texture = engine.createDynamicTexture(options.width, options.height, generateMipMaps, samplingMode);
@@ -134,10 +137,14 @@ export class DynamicTexture extends Texture {
 
     /**
      * Clears the texture
+     * @param clearColor Defines the clear color to use
      */
-    public clear(): void {
+    public clear(clearColor?: string): void {
         const size = this.getSize();
-        this._context.fillRect(0, 0, size.width, size.height);
+        if (clearColor) {
+            this._context.fillStyle = clearColor;
+        }
+        this._context.clearRect(0, 0, size.width, size.height);
     }
 
     /**
@@ -165,7 +172,7 @@ export class DynamicTexture extends Texture {
      * @param y defines the placement of the text from the top when invertY is true and from the bottom when false
      * @param font defines the font to be used with font-style, font-size, font-name
      * @param color defines the color used for the text
-     * @param clearColor defines the color for the canvas, use null to not overwrite canvas
+     * @param fillColor defines the color for the canvas, use null to not overwrite canvas (this bleands with the background to replace, use the clear function)
      * @param invertY defines the direction for the Y axis (default is true - y increases downwards)
      * @param update defines whether texture is immediately update (default is true)
      */
@@ -175,13 +182,13 @@ export class DynamicTexture extends Texture {
         y: number | null | undefined,
         font: string,
         color: string | null,
-        clearColor: string | null,
+        fillColor: string | null,
         invertY?: boolean,
         update = true
     ) {
         const size = this.getSize();
-        if (clearColor) {
-            this._context.fillStyle = clearColor;
+        if (fillColor) {
+            this._context.fillStyle = fillColor;
             this._context.fillRect(0, 0, size.width, size.height);
         }
 
@@ -201,6 +208,19 @@ export class DynamicTexture extends Texture {
         if (update) {
             this.update(invertY);
         }
+    }
+
+    /**
+     * Disposes the dynamic texture.
+     */
+    public dispose(): void {
+        super.dispose();
+
+        if (this._ownCanvas) {
+            this._canvas.remove();
+        }
+        (this._canvas as any) = null;
+        (this._context as any) = null;
     }
 
     /**

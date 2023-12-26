@@ -19,6 +19,7 @@ import type { ViewerConfiguration } from "../configuration/configuration";
 import type { ISceneConfiguration } from "../configuration/interfaces/sceneConfiguration";
 import type { IModelConfiguration } from "../configuration/interfaces/modelConfiguration";
 import type { Nullable } from "core/types";
+import { Logger } from "core/Misc/logger";
 
 import "core/Lights/Shadows/shadowGeneratorSceneComponent";
 
@@ -39,7 +40,10 @@ export class DefaultViewer extends AbstractViewerWithTemplate {
      * @param containerElement the element in which the templates will be rendered
      * @param initialConfiguration the initial configuration. Defaults to extending the default configuration
      */
-    constructor(public containerElement: Element, initialConfiguration: ViewerConfiguration = { extends: "default" }) {
+    constructor(
+        public containerElement: Element,
+        initialConfiguration: ViewerConfiguration = { extends: "default" }
+    ) {
         super(containerElement, initialConfiguration);
 
         this.onModelLoadedObservable.add(this._onModelLoaded);
@@ -407,18 +411,6 @@ export class DefaultViewer extends AbstractViewerWithTemplate {
     };
 
     protected _initVR() {
-        this.engine.onVRDisplayChangedObservable.add(() => {
-            const viewerTemplate = this.templateManager.getTemplate("viewer");
-            const viewerElement = viewerTemplate && viewerTemplate.parent;
-
-            if (viewerElement) {
-                if (this.sceneManager.vrHelper!.isInVRMode) {
-                    viewerElement.classList.add("in-vr");
-                } else {
-                    viewerElement.classList.remove("in-vr");
-                }
-            }
-        });
         if (this.sceneManager.vrHelper) {
             // due to the way the experience helper is exisintg VR, this must be added.
             this.sceneManager.vrHelper.onExitingVR.add(() => {
@@ -531,7 +523,7 @@ export class DefaultViewer extends AbstractViewerWithTemplate {
         }
         this.showLoadingScreen();
         return super.loadModel(model!, true).catch((error) => {
-            console.log(error);
+            Logger.Log(error);
             this.hideLoadingScreen();
             this.showOverlayScreen("error");
             return Promise.reject(error);
