@@ -24,6 +24,7 @@ import { GLTFComponent } from "./tools/gltfComponent";
 // TODO - does it still work if loading the modules from the correct files?
 import type { GLTFData } from "serializers/glTF/2.0/index";
 import { GLTF2Export } from "serializers/glTF/2.0/index";
+import { USDZExport } from "serializers/USDZ/index";
 import { FloatLineComponent } from "shared-ui-components/lines/floatLineComponent";
 import type { IScreenshotSize } from "core/Misc/interfaces/screenshotSize";
 import { NumericInputComponent } from "shared-ui-components/lines/numericInputComponent";
@@ -55,6 +56,8 @@ interface IGlbExportOptions {
     exportLights: boolean;
 }
 
+declare const fflate: any;
+
 export class ToolsTabComponent extends PaneComponent {
     private _lockObject = new LockObject();
     private _videoRecorder: Nullable<VideoRecorder>;
@@ -62,6 +65,7 @@ export class ToolsTabComponent extends PaneComponent {
     private _gifOptions = { width: 512, frequency: 200 };
     private _useWidthHeight = false;
     private _isExportingGltf = false;
+    private _isExportingUSDZ = false;
     private _gltfExportOptions: IGlbExportOptions = { exportDisabledNodes: false, exportSkyboxes: false, exportCameras: false, exportLights: false };
     private _gifWorkerBlob: Blob;
     private _gifRecorder: any;
@@ -296,6 +300,11 @@ export class ToolsTabComponent extends PaneComponent {
         );
     }
 
+    exportUSDZ() {
+        // const scene = this.props.scene;
+        console.log(USDZExport);
+    }
+
     exportBabylon() {
         const scene = this.props.scene;
 
@@ -499,6 +508,14 @@ export class ToolsTabComponent extends PaneComponent {
                                 onSelect={(value) => (this._gltfExportOptions.exportLights = value)}
                             />
                             <ButtonLineComponent label="Export to GLB" onClick={() => this.exportGLTF()} />
+                        </>
+                    )}
+                </LineContainerComponent>
+                <LineContainerComponent title="USDZ EXPORT" selection={this.props.globalState}>
+                    {this._isExportingUSDZ && <TextLineComponent label="Please wait..exporting" ignoreValue={true} />}
+                    {!this._isExportingUSDZ && (
+                        <>
+                            <ButtonLineComponent label="Export to USDZ" onClick={() => this.exportUSDZ()} />
                         </>
                     )}
                 </LineContainerComponent>

@@ -19,8 +19,9 @@ import type {
 import { AccessorType, ImageMimeType, MeshPrimitiveMode, AccessorComponentType, CameraType } from "babylonjs-gltf2interface";
 
 import type { FloatArray, IndicesArray, Nullable } from "core/types";
-import { Matrix, TmpVectors } from "core/Maths/math.vector";
-import { Vector2, Vector3, Vector4, Quaternion } from "core/Maths/math.vector";
+import type { Matrix } from "core/Maths/math.vector";
+import { TmpVectors, Vector2, Vector3, Vector4, Quaternion } from "core/Maths/math.vector";
+
 import { Color3, Color4 } from "core/Maths/math.color";
 import { Tools } from "core/Misc/tools";
 import { VertexBuffer } from "core/Buffers/buffer";
@@ -48,65 +49,10 @@ import { _GLTFAnimation } from "./glTFAnimation";
 import { Camera } from "core/Cameras/camera";
 import { EngineStore } from "core/Engines/engineStore";
 import { MultiMaterial } from "core/Materials/multiMaterial";
-
-// Matrix that converts handedness on the X-axis.
-const convertHandednessMatrix = Matrix.Compose(new Vector3(-1, 1, 1), Quaternion.Identity(), Vector3.Zero());
+import { isNoopNode, convertNodeHandedness } from "serializers/tools";
 
 // 180 degrees rotation in Y.
 const rotation180Y = new Quaternion(0, 1, 0, 0);
-
-function isNoopNode(node: Node, useRightHandedSystem: boolean): boolean {
-    if (!(node instanceof TransformNode)) {
-        return false;
-    }
-
-    // Transform
-    if (useRightHandedSystem) {
-        const matrix = node.getWorldMatrix();
-        if (!matrix.isIdentity()) {
-            return false;
-        }
-    } else {
-        const matrix = node.getWorldMatrix().multiplyToRef(convertHandednessMatrix, TmpVectors.Matrix[0]);
-        if (!matrix.isIdentity()) {
-            return false;
-        }
-    }
-
-    // Geometry
-    if ((node instanceof Mesh && node.geometry) || (node instanceof InstancedMesh && node.sourceMesh.geometry)) {
-        return false;
-    }
-
-    return true;
-}
-
-function convertNodeHandedness(node: INode): void {
-    const translation = Vector3.FromArrayToRef(node.translation || [0, 0, 0], 0, TmpVectors.Vector3[0]);
-    const rotation = Quaternion.FromArrayToRef(node.rotation || [0, 0, 0, 1], 0, TmpVectors.Quaternion[0]);
-    const scale = Vector3.FromArrayToRef(node.scale || [1, 1, 1], 0, TmpVectors.Vector3[1]);
-    const matrix = Matrix.ComposeToRef(scale, rotation, translation, TmpVectors.Matrix[0]).multiplyToRef(convertHandednessMatrix, TmpVectors.Matrix[0]);
-
-    matrix.decompose(scale, rotation, translation);
-
-    if (translation.equalsToFloats(0, 0, 0)) {
-        delete node.translation;
-    } else {
-        node.translation = translation.asArray();
-    }
-
-    if (Quaternion.IsIdentity(rotation)) {
-        delete node.rotation;
-    } else {
-        node.rotation = rotation.asArray();
-    }
-
-    if (scale.equalsToFloats(1, 1, 1)) {
-        delete node.scale;
-    } else {
-        node.scale = scale.asArray();
-    }
-}
 
 /**
  * Utility interface for storing vertex attribute data
@@ -174,6 +120,9 @@ export class _Exporter {
      */
     public _materials: IMaterial[];
 
+    /**
+     *
+     */
     public _materialMap: { [materialID: number]: number };
     /**
      * Stores all the generated texture information, which is referenced by glTF materials
@@ -229,6 +178,9 @@ export class _Exporter {
 
     private _localEngine: Engine;
 
+    /**
+     *
+     */
     public _glTFMaterialExporter: _GLTFMaterialExporter;
 
     private _extensions: { [name: string]: IGLTFExporterExtensionV2 } = {};
