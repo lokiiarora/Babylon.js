@@ -1,3 +1,4 @@
+/* eslint-disable jsdoc/require-returns-check */
 import type { Observer } from "../Misc/observable";
 import { Observable } from "../Misc/observable";
 import { Tools, AsyncLoop } from "../Misc/tools";
@@ -2339,8 +2340,8 @@ export class Mesh extends AbstractMesh implements IGetSetVerticesData {
 
             this._internalMeshDataInfo._effectiveMaterial = material;
         } else if (
-            (material._storeEffectOnSubMeshes && !subMesh.effect?._wasPreviouslyReady) ||
-            (!material._storeEffectOnSubMeshes && !material.getEffect()?._wasPreviouslyReady)
+            (material._storeEffectOnSubMeshes && !subMesh._drawWrapper?._wasPreviouslyReady) ||
+            (!material._storeEffectOnSubMeshes && !material._getDrawWrapper()._wasPreviouslyReady)
         ) {
             if (oldCamera) {
                 oldCamera.maxZ = oldCameraMaxZ;
@@ -2783,6 +2784,17 @@ export class Mesh extends AbstractMesh implements IGetSetVerticesData {
                     .toArray(data, index);
             }
             this.setVerticesData(VertexBuffer.NormalKind, data, (<VertexBuffer>this.getVertexBuffer(VertexBuffer.NormalKind)).isUpdatable());
+        }
+
+        // Tangents
+        if (this.isVerticesDataPresent(VertexBuffer.TangentKind)) {
+            data = <FloatArray>this.getVerticesData(VertexBuffer.TangentKind);
+            for (index = 0; index < data.length; index += 4) {
+                Vector3.TransformNormalFromFloatsToRef(data[index], data[index + 1], data[index + 2], transform, temp)
+                    .normalize()
+                    .toArray(data, index);
+            }
+            this.setVerticesData(VertexBuffer.TangentKind, data, (<VertexBuffer>this.getVertexBuffer(VertexBuffer.TangentKind)).isUpdatable());
         }
 
         // flip faces?
@@ -3617,6 +3629,7 @@ export class Mesh extends AbstractMesh implements IGetSetVerticesData {
     /**
      * Serialize current mesh
      * @param serializationObject defines the object which will receive the serialization data
+     * @returns the serialized object
      */
     public serialize(serializationObject: any = {}): any {
         serializationObject.name = this.name;

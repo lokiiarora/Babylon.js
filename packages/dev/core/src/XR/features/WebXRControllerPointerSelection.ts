@@ -167,6 +167,7 @@ export class WebXRControllerPointerSelection extends WebXRAbstractFeature {
             case "gaze":
                 return this._attachGazeMode(xrController);
             case "screen":
+            case "transient-pointer":
                 return this._attachScreenRayMode(xrController);
         }
     };
@@ -423,7 +424,9 @@ export class WebXRControllerPointerSelection extends WebXRAbstractFeature {
                         typeof this._screenCoordinatesRef.x === "number" &&
                         typeof this._screenCoordinatesRef.y === "number" &&
                         !isNaN(this._screenCoordinatesRef.x) &&
-                        !isNaN(this._screenCoordinatesRef.y)
+                        !isNaN(this._screenCoordinatesRef.y) &&
+                        this._screenCoordinatesRef.x !== Infinity &&
+                        this._screenCoordinatesRef.y !== Infinity
                     ) {
                         scene.pointerX = this._screenCoordinatesRef.x;
                         scene.pointerY = this._screenCoordinatesRef.y;
@@ -459,6 +462,7 @@ export class WebXRControllerPointerSelection extends WebXRAbstractFeature {
             if (controllerData.pick && controllerData.xrController) {
                 controllerData.pick.aimTransform = controllerData.xrController.pointer;
                 controllerData.pick.gripTransform = controllerData.xrController.grip || null;
+                controllerData.pick.originMesh = controllerData.xrController.pointer;
             }
 
             const pick = controllerData.pick;

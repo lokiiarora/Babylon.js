@@ -357,6 +357,7 @@ export class Engine extends ThinEngine {
         }
     }
 
+    // eslint-disable-next-line jsdoc/require-returns-check
     /**
      * Method called to create the default loading screen.
      * This can be overridden in your own app.
@@ -1192,21 +1193,43 @@ export class Engine extends ThinEngine {
         this._bindTexture(channel, postProcess?._outputTexture?.texture ?? null, name);
     }
 
+    /**
+     * sets the object from which width and height will be taken from when getting render width and height
+     * Will fallback to the gl object
+     * @param dimensions the framebuffer width and height that will be used.
+     */
+    public set framebufferDimensionsObject(dimensions: Nullable<{ framebufferWidth: number; framebufferHeight: number }>) {
+        this._framebufferDimensionsObject = dimensions;
+        if (this._framebufferDimensionsObject) {
+            this.onResizeObservable.notifyObservers(this);
+        }
+    }
+
     protected _rebuildBuffers(): void {
         // Index / Vertex
         for (const scene of this.scenes) {
             scene.resetCachedMaterial();
             scene._rebuildGeometries();
-            scene._rebuildTextures();
         }
 
         for (const scene of this._virtualScenes) {
             scene.resetCachedMaterial();
             scene._rebuildGeometries();
-            scene._rebuildTextures();
         }
 
         super._rebuildBuffers();
+    }
+
+    protected _rebuildTextures(): void {
+        for (const scene of this.scenes) {
+            scene._rebuildTextures();
+        }
+
+        for (const scene of this._virtualScenes) {
+            scene._rebuildTextures();
+        }
+
+        super._rebuildTextures();
     }
 
     /** @internal */
