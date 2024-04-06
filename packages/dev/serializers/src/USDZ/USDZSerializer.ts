@@ -86,6 +86,7 @@ export class USDZExport {
         if (!options.zipSync && typeof fflate !== "undefined") {
             options.zipSync = (data, options) => fflate.zipSync(data, options);
         }
+        debugger;
         options = {
             ar: {
                 anchoring: { type: "plane" },
@@ -112,10 +113,7 @@ export class USDZExport {
             .forEach((mesh) => {
                 const material = mesh.material ?? sharedMat;
                 const geometryFileName: string = "geometries/Geometry_" + mesh.uniqueId + ".usda";
-                let rootParent: Nullable<Node> = mesh;
-                while (rootParent?.parent) {
-                    rootParent = mesh.parent;
-                }
+                const rootParent: Nullable<Node> = mesh.parent;
                 const noopNode = rootParent && isNoopNode(rootParent, scene.useRightHandedSystem) && !scene.useRightHandedSystem;
                 if (noopNode) {
                     (mesh.parent as TransformNode).scaling.z = 1;
@@ -123,7 +121,7 @@ export class USDZExport {
                 switch (material.getClassName()) {
                     case "PBRMaterial":
                         if (!(geometryFileName in files)) {
-                            const meshObject = USDZExport._BuildMeshObject(mesh);
+                            const meshObject = USDZExport._BuildMeshObject(scene, mesh);
                             files[geometryFileName] = USDZExport._BuildUSDZFileAsString(meshObject);
                         }
 
@@ -243,8 +241,8 @@ export class USDZExport {
     `;
     }
 
-    private static _BuildMeshObject(_mesh: AbstractMesh) {
-        const mesh = USDZExport._BuildMesh(_mesh);
+    private static _BuildMeshObject(scene: Scene, _mesh: AbstractMesh) {
+        const mesh = USDZExport._BuildMesh(scene, _mesh);
         return `
     def "Geometry"
     {
@@ -253,10 +251,18 @@ export class USDZExport {
     `;
     }
 
-    private static _BuildMesh(mesh: AbstractMesh) {
+    private static _BuildMesh(scene: Scene, mesh: AbstractMesh) {
         const positions = mesh.getVerticesData(VertexBuffer.PositionKind) ?? [];
         const count = positions?.length ?? 0;
-        const normals = mesh.getVerticesData(VertexBuffer.NormalKind) ?? [];
+        const normals = (mesh.getVerticesData(VertexBuffer.NormalKind) ?? []).map((n, idx) => {
+            if (idx % 3 === 0) {
+                return scene.useRightHandedSystem ? n : -n;
+            }
+            if (idx % 3 === 1) {
+                return scene.useRightHandedSystem ? n : -n;
+            }
+            return n;
+        });
         const normalCount = normals?.length ?? 0;
 
         return `
@@ -393,7 +399,7 @@ export class USDZExport {
 
     private static _BuildCamera(camera: Camera) {
         const scene = camera.getScene();
-        const name = `${camera.name}_${camera.uniqueId}`;
+        const name = `${camera.name.replace(/ /g, "_")}_${camera.uniqueId}`;
         const mat = camera.getWorldMatrix();
         const aspect = scene.getEngine().getAspectRatio(camera, true);
 
@@ -481,6 +487,7 @@ export class USDZExport {
     }
 
     private static async _BuildMaterial(_material: Material, textures: { [id: string]: Texture }, quickLookCompatible = false) {
+        debugger;
         // https://graphics.pixar.com/usd/docs/UsdPreviewSurface-Proposal.html
         const pad = "			";
         const inputs = [];
@@ -608,8 +615,8 @@ export class USDZExport {
             inputs.push(`${pad}float inputs:occlusion.connect = </Materials/Material_${material.uniqueId}/Texture_${maps.ao.uniqueId}_occlusion.outputs:r>`);
             samplers.push(buildTexture(maps.ao, "occlusion"));
         } else {
-            inputs.push(`${pad}float inputs:roughness = ${material.roughness}`);
-            inputs.push(`${pad}float inputs:metallic = ${material.metallic}`);
+            material.roughness && inputs.push(`${pad}float inputs:roughness = ${material.roughness}`);
+            material.metallic && inputs.push(`${pad}float inputs:metallic = ${material.metallic}`);
         }
 
         if (material.opacityTexture !== null) {

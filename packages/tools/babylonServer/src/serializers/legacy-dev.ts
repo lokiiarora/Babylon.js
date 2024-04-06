@@ -35,6 +35,7 @@ import * as Datas from "../../../../dev/serializers/src/glTF/2.0/glTFData";
 import * as Serializers from "../../../../dev/serializers/src/glTF/2.0/glTFSerializer";
 import * as Extensions from "../../../../dev/serializers/src/glTF/2.0/Extensions/index";
 import * as GLTF2 from "../../../../dev/serializers/src/glTF/2.0/index";
+import * as USDZ from "../../../../dev/serializers/src/USDZ/index";
 
 /**
  * This is the entry point for the UMD module.
@@ -46,6 +47,8 @@ if (typeof globalObject !== "undefined") {
     BABYLON.GLTF2 = BABYLON.GLTF2 || {};
     BABYLON.GLTF2.Exporter = BABYLON.GLTF2.Exporter || {};
     BABYLON.GLTF2.Exporter.Extensions = BABYLON.GLTF2.Exporter.Extensions || {};
+    BABYLON.USDZ = BABYLON.USDZ || {};
+    BABYLON.USDZ.Exporter = USDZ.USDZExport;
 
     const keys = [];
     for (const key in Exporters) {
@@ -78,3 +81,4 @@ if (typeof globalObject !== "undefined") {
 
 export * from "../../../../dev/serializers/src/glTF/glTFFileExporter";
 export * from "../../../../dev/serializers/src/glTF/2.0/index";
+export * from "../../../../dev/serializers/src/USDZ/index";

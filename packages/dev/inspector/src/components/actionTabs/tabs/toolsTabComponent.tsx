@@ -24,7 +24,7 @@ import { GLTFComponent } from "./tools/gltfComponent";
 // TODO - does it still work if loading the modules from the correct files?
 import type { GLTFData } from "serializers/glTF/2.0/index";
 import { GLTF2Export } from "serializers/glTF/2.0/index";
-import { USDZExport } from "serializers/USDZ/index";
+import { USDZExport } from "serializers/index";
 import { FloatLineComponent } from "shared-ui-components/lines/floatLineComponent";
 import type { IScreenshotSize } from "core/Misc/interfaces/screenshotSize";
 import { NumericInputComponent } from "shared-ui-components/lines/numericInputComponent";
@@ -301,8 +301,24 @@ export class ToolsTabComponent extends PaneComponent {
     }
 
     exportUSDZ() {
-        // const scene = this.props.scene;
-        console.log(USDZExport);
+        const scene = this.props.scene;
+        USDZExport.ExportAsBinaryZip(
+            {
+                zipSync(data, options) {
+                    return fflate.zipSync(data, options);
+                },
+                ar: {
+                    anchoring: {
+                        type: "plane",
+                    },
+                    planeAnchoring: {
+                        alignment: "horizontal",
+                    },
+                },
+            },
+            scene,
+            true
+        );
     }
 
     exportBabylon() {
