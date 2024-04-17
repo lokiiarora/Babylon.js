@@ -120,6 +120,11 @@ export class NodeMaterialConnectionPoint {
     public onConnectionObservable = new Observable<NodeMaterialConnectionPoint>();
 
     /**
+     * Observable triggered when this point is disconnected
+     */
+    public onDisconnectionObservable = new Observable<NodeMaterialConnectionPoint>();
+
+    /**
      * Gets or sets the associated variable name in the shader
      */
     public get associatedVariableName(): string {
@@ -482,6 +487,7 @@ export class NodeMaterialConnectionPoint {
      */
     public connectTo(connectionPoint: NodeMaterialConnectionPoint, ignoreConstraints = false): NodeMaterialConnectionPoint {
         if (!ignoreConstraints && !this.canConnectTo(connectionPoint)) {
+            // eslint-disable-next-line no-throw-literal
             throw "Cannot connect these two connectors.";
         }
 
@@ -512,6 +518,10 @@ export class NodeMaterialConnectionPoint {
         endpoint._connectedPoint = null;
         this._enforceAssociatedVariableName = false;
         endpoint._enforceAssociatedVariableName = false;
+
+        this.onDisconnectionObservable.notifyObservers(endpoint);
+        endpoint.onDisconnectionObservable.notifyObservers(this);
+
         return this;
     }
 
@@ -561,5 +571,6 @@ export class NodeMaterialConnectionPoint {
      */
     public dispose() {
         this.onConnectionObservable.clear();
+        this.onDisconnectionObservable.clear();
     }
 }

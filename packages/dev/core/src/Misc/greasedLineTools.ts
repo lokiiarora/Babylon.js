@@ -82,6 +82,7 @@ export class GreasedLineTools {
      * @param p1 point1 position of the face
      * @param p2 point2 position of the face
      * @param p3 point3 position of the face
+     * @param points array of points to search in
      * @returns original points or null if any edge length is zero
      */
     public static OmitDuplicatesPredicate(p1: Vector3, p2: Vector3, p3: Vector3, points: Vector3[][]) {
@@ -251,6 +252,28 @@ export class GreasedLineTools {
     }
 
     /**
+     * Gets the the length from the beginning to each point of the line as array.
+     * @param data array of line points
+     * @returns length array of the line
+     */
+    public static GetLineLengthArray(data: number[]): Float32Array {
+        const out = new Float32Array(data.length / 3);
+        let length = 0;
+        for (let index = 0, pointsLength = data.length / 3 - 1; index < pointsLength; index++) {
+            let x = data[index * 3 + 0];
+            let y = data[index * 3 + 1];
+            let z = data[index * 3 + 2];
+            x -= data[index * 3 + 3];
+            y -= data[index * 3 + 4];
+            z -= data[index * 3 + 5];
+            const currentLength = Math.sqrt(x * x + y * y + z * z);
+            length += currentLength;
+            out[index + 1] = length;
+        }
+        return out;
+    }
+
+    /**
      * Divides a segment into smaller segments.
      * A segment is a part of the line between it's two points.
      * @param point1 first point of the line
@@ -355,6 +378,7 @@ export class GreasedLineTools {
      * @param lineSegments segments of the line
      * @param lineLength total length of the line
      * @param visbility normalized value of visibility
+     * @param localSpace if true the result will be in local space (default is false)
      * @returns world space coordinate of the last visible piece of the line
      */
     public static GetPositionOnLineByVisibility(lineSegments: { point1: Vector3; point2: Vector3; length: number }[], lineLength: number, visbility: number, localSpace = false) {
@@ -495,6 +519,9 @@ export class GreasedLineTools {
      * Creates a RawTexture from an RGBA color array and sets it on the plugin material instance.
      * @param name name of the texture
      * @param colors Uint8Array of colors
+     * @param colorsSampling sampling mode of the created texture
+     * @param scene Scene
+     * @returns the colors texture
      */
     public static CreateColorsTexture(name: string, colors: Color3[], colorsSampling: number, scene: Scene) {
         const colorsArray = GreasedLineTools.Color3toRGBAUint8(colors);
@@ -529,7 +556,7 @@ export class GreasedLineTools {
 
     /**
      * Converts boolean to number.
-     * @param bool
+     * @param bool the bool value
      * @returns 1 if true, 0 if false.
      */
     public static BooleanToNumber(bool?: boolean) {
