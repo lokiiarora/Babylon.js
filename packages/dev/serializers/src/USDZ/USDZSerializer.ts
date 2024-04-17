@@ -86,7 +86,6 @@ export class USDZExport {
         if (!options.zipSync && typeof fflate !== "undefined") {
             options.zipSync = (data, options) => fflate.zipSync(data, options);
         }
-        debugger;
         options = {
             ar: {
                 anchoring: { type: "plane" },
@@ -487,7 +486,6 @@ export class USDZExport {
     }
 
     private static async _BuildMaterial(_material: Material, textures: { [id: string]: Texture }, quickLookCompatible = false) {
-        debugger;
         // https://graphics.pixar.com/usd/docs/UsdPreviewSurface-Proposal.html
         const pad = "			";
         const inputs = [];
